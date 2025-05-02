@@ -1,5 +1,3 @@
-from typing import Dict, List
-
 import requests
 import traceback
 import time

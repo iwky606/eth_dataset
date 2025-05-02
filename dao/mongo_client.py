@@ -1,10 +1,7 @@
 import traceback
 
-from pymongo import MongoClient, InsertOne
+from pymongo import MongoClient
 import atexit
-from typing import Optional, Dict, Any
-
-from pymongo.errors import BulkWriteError
 
 # 常量定义
 ETH_DATASET = 'eth_dataset'
@@ -56,16 +53,16 @@ def query_invalid_address(address):
     return query_address(address, INVALID_ADDRESS)
 
 
-def save_address(address, flag: Any, collection_name):
+def save_address(address, flag, collection_name):
     data = {'address': address, 'flag': flag}
     return save_to_eth_dataset(data, collection_name)
 
 
-def save_valid_address(address, flag: Any):
+def save_valid_address(address, flag):
     return save_address(address, flag, VALID_ADDRESS)
 
 
-def save_invalid_address(address, flag: Any):
+def save_invalid_address(address, flag):
     return save_address(address, flag, INVALID_ADDRESS)
 
 
@@ -83,3 +80,4 @@ def save_batch_eth_dataset(
         return inserted_ids
     except Exception as e:
         traceback.print_exc()
+

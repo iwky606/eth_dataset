@@ -3,7 +3,7 @@ from api import etherscan_api
 from dao import mongo_client
 from dao.mongo_client import TRANSACTION, ERC20_TRANSFER
 
-df = pd.read_csv('flag_data.csv')
+df = pd.read_csv('address_2.csv')
 # 提取两列数据
 selected_columns = df[['Address', 'FLAG']]
 
@@ -21,7 +21,9 @@ cnt = 0
 for index, row in selected_columns.iterrows():
     address, flag = row['Address'], row['FLAG']
     if query_process_address(address):
+        print(f'address: {address}\n has been processed')
         continue
+    print(f'address: {address}\n is processing')
     eth_tx, erc20_tx, status = etherscan_api.get_all_transactions(address)
 
     if not status:
@@ -37,6 +39,9 @@ for index, row in selected_columns.iterrows():
 
     # 批量写入erc20_transaction
     mongo_client.save_batch_eth_dataset(erc20_tx, ERC20_TRANSFER)
+
+    print(f'address: {address}\n done')
+
 
     # cnt += 1
     # if cnt > 10:
