@@ -10,6 +10,14 @@ INVALID_ADDRESS = 'invalid_address'
 TRANSACTION = 'transaction'
 ERC20_TRANSFER = 'erc20_transfer'
 
+# second
+TEST = ''
+SECOND_ADDRESS = 'second_address_v3'
+INVALID_SECOND_ADDRESS = 'invalid_second_address' + TEST
+VALID_SECOND_ADDRESS = 'valid_second_address' + TEST
+SECOND_TRANSACTION = 'second_transaction' + TEST
+SECOND_ERC20_TRANSFER = 'second_erc20_transfer' + TEST
+
 # 初始化连接
 client = MongoClient("mongodb://root:123456@localhost:27017/")
 db = client[ETH_DATASET]  # 获取指定数据库
@@ -45,25 +53,18 @@ def query_address(address, collection_name):
         return None
 
 
-def query_valid_address(address):
-    return query_address(address, VALID_ADDRESS)
-
-
-def query_invalid_address(address):
-    return query_address(address, INVALID_ADDRESS)
+def query_second_address():
+    try:
+        collection = db[SECOND_ADDRESS]
+        return [doc['address'] for doc in collection.find()]
+    except Exception as e:
+        print(f"查询集合 {SECOND_ADDRESS} 失败: {str(e)}")
+        return []
 
 
 def save_address(address, flag, collection_name):
     data = {'address': address, 'flag': flag}
     return save_to_eth_dataset(data, collection_name)
-
-
-def save_valid_address(address, flag):
-    return save_address(address, flag, VALID_ADDRESS)
-
-
-def save_invalid_address(address, flag):
-    return save_address(address, flag, INVALID_ADDRESS)
 
 
 def save_batch_eth_dataset(
@@ -80,4 +81,3 @@ def save_batch_eth_dataset(
         return inserted_ids
     except Exception as e:
         traceback.print_exc()
-

@@ -5,9 +5,10 @@ from dao.mongo_client import client, ETH_DATASET
 
 
 class Trans2VecNeighborGenerator:
-    def __init__(self, db_name=ETH_DATASET, alpha=0.5):
+    def __init__(self, collection_name, db_name=ETH_DATASET, alpha=0.5):
         self.client = client
         self.db = self.client[db_name]
+        self.transactions = self.db[collection_name]
         self.alpha = alpha
         self.graph = {}
 
@@ -16,7 +17,7 @@ class Trans2VecNeighborGenerator:
         valid_addrs = {doc['address'] for doc in self.db.valid_address.find({'flag': {'$in': [1, 2]}})}
         adj_dict = {}
 
-        for tx in tqdm(self.db.flag_transaction.find(), desc="Processing transactions"):
+        for tx in tqdm(self.transactions.find(), desc="Processing transactions"):
             from_addr = tx.get('from')
             to_addr = tx.get('to')
 
@@ -136,5 +137,7 @@ class Trans2VecNeighborGenerator:
 
 
 if __name__ == "__main__":
-    processor = Trans2VecNeighborGenerator(alpha=0.5)
+    # processor = Trans2VecNeighborGenerator(collection_name='flag_transaction', alpha=0.5)
+    processor = Trans2VecNeighborGenerator(collection_name='flag_erc20_transfer', alpha=0.5)
+
     processor.run()
