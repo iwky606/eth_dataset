@@ -18,6 +18,8 @@ VALID_SECOND_ADDRESS = 'valid_second_address' + TEST
 SECOND_TRANSACTION = 'second_transaction' + TEST
 SECOND_ERC20_TRANSFER = 'second_erc20_transfer' + TEST
 
+NODE_FEATURES = 'node_features'
+
 # 初始化连接
 client = MongoClient("mongodb://root:123456@localhost:27017/")
 db = client[ETH_DATASET]  # 获取指定数据库

@@ -89,6 +89,8 @@ def get_all_transactions(address: str):
 
 
 if __name__ == "__main__":
-    result, result2, status = get_all_transactions('0x4Bf722014E54AeAB05fcF1519E6e4C0c3F742e43 ')
+    result, result2, status = get_all_transactions('0xb53e95a4b7c5e15a790df3a66709b2e9f1cf9e3f')
+    import json
     print(result)
-    print(result2)
+
+    print(json.dumps(result2, indent=4))
