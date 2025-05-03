@@ -4,14 +4,29 @@ import numpy as np
 from dao.mongo_client import db, NODE_FEATURES
 from dao import mongo_client
 
+DOC_CONFIG_FLAG = {
+    "transaction": db['transaction_uk'],
+    "erc20_transfer": db['erc20_transfer_uk_v3'],
+    "address": db['valid_address'],
+    "flag": [1, 2]
+}
+
+DOC_CONFIG_SECOND = {
+    "transaction": db['second_transaction_uk'],
+    "erc20_transfer": db['second_erc20_transfer_uk'],
+    "address": db['valid_second_address'],
+    "flag": [0]
+}
+DOC_CONFIG = DOC_CONFIG_SECOND
+
 
 def get_address_features(address):
     # 连接MongoDB
 
     # 获取所有相关交易
     tx_query = {"$or": [{"from": address}, {"to": address}]}
-    normal_txs = list(db.transaction_uk.find(tx_query))
-    erc20_txs = list(db.erc20_transfer_uk.find(tx_query))
+    normal_txs = list(DOC_CONFIG['transaction'].find(tx_query))
+    erc20_txs = list(DOC_CONFIG['erc20_transfer'].find(tx_query))
 
     # 初始化特征字典
     features = {"Address": address}
@@ -92,10 +107,10 @@ def process_normal_transactions(features, txs, address):
         "Min_Value_Received": safe_decimal_op(values_received, 'min'),
         "Max_Value_Received": safe_decimal_op(values_received, 'max'),
         "Avg_Value_Received5": safe_decimal_op(values_received, 'mean'),
-        "Avg_Gas_Fee (ETH)": safe_decimal_op(gas_fees, 'mean'),
-        "Max_Gas_Fee (ETH)": safe_decimal_op(gas_fees, 'max'),
-        "Min_Gas_Fee (ETH)": safe_decimal_op(gas_fees, 'min'),
-        "Total_Transactions(Including_Tnx_to_Create_Contract)": len(txs),
+        "Avg_Gas_Fee": safe_decimal_op(gas_fees, 'mean'),
+        "Max_Gas_Fee": safe_decimal_op(gas_fees, 'max'),
+        "Min_Gas_Fee": safe_decimal_op(gas_fees, 'min'),
+        "Total_Transactions": len(txs),
         "Total_Ether_Sent": sum(values_sent),
         "Total_Ether_Received": sum(values_received),
         "Total_Ether_Sent_Contracts": sum(contract_values),
@@ -216,9 +231,9 @@ def calculate_derived_features(features):
         features[f"ERC20_Avg_Time_Between_{tx_type.title()}_Tnx"] = avg
 
     # Gas费用特征
-    features["ERC20 Avg gas fee (ETH)"] = np.mean(features["_erc20_gas_fees"]) if features["_erc20_gas_fees"] else 0
-    features["ERC20 Max gas fee (ETH)"] = np.max(features["_erc20_gas_fees"]) if features["_erc20_gas_fees"] else 0
-    features["ERC20 Min gas fee (ETH)"] = np.min(features["_erc20_gas_fees"]) if features["_erc20_gas_fees"] else 0
+    features["ERC20_Avg_gas_fee"] = np.mean(features["_erc20_gas_fees"]) if features["_erc20_gas_fees"] else 0
+    features["ERC20_Max_gas_fee"] = np.max(features["_erc20_gas_fees"]) if features["_erc20_gas_fees"] else 0
+    features["ERC20_Min_gas_fee"] = np.min(features["_erc20_gas_fees"]) if features["_erc20_gas_fees"] else 0
     # features["Total_Ether_Balance"] = features["Total_Ether_Received"] - features["Total_Ether_Sent"]
 
     # 清理临时字段
@@ -231,7 +246,7 @@ def get_csv_features(address):
     import pandas as pd
 
     # 读取CSV文件
-    df = pd.read_csv('flag_data.csv')
+    df = pd.read_csv('../flag_data_wash/flag_data.csv')
 
     # 过滤符合条件的行
     filtered_df = df[df['Address'] == address]
@@ -255,15 +270,24 @@ def save_features(features):
 
 
 def solve_address_features(address):
-    features = get_csv_features(address)
+    if db.train_nodes.find_one({'Address': address}):
+        return
+    features = get_address_features(address)
     save_features(features)
+
+
+def get_valid_address_process():
+    nodes = DOC_CONFIG['address'].find({"flag": {"$in": DOC_CONFIG['flag']}})
+    for node in nodes:
+        solve_address_features(node['address'])
 
 
 # 使用示例
 if __name__ == "__main__":
-    address = '0xb53e95a4b7c5e15a790df3a66709b2e9f1cf9e3f'
-    features = get_address_features(address)
-    import json
-
-    print(json.dumps(features))
-    print(json.dumps(get_csv_features(address)))
+    # address = '0xb53e95a4b7c5e15a790df3a66709b2e9f1cf9e3f'
+    # features = get_address_features(address)
+    # import json
+    #
+    # print(json.dumps(features))
+    # print(json.dumps(get_csv_features(address)))
+    get_valid_address_process()
