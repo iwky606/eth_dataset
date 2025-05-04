@@ -1,14 +1,26 @@
 import dgl
 import pandas as pd
 import torch
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, RobustScaler
 import numpy as np
 
 
 def load_mongo_data():
     from dao.mongo_client import db
 
+    # 加载全部节点（包含flag=0,1,2）
     nodes = list(db.train_nodes.find({}, {"address": 1, "flag": 1}))
+
+    # 直接转换标签语义
+    for node in nodes:
+        original_flag = node["flag"]
+        if original_flag == 2:
+            node["flag"] = 0  # 原2->正常
+        elif original_flag == 0:
+            node["flag"] = 2  # 原0->未知
+        # flag=1保持为欺诈
+
+    # 其他数据加载逻辑不变
     node_features = list(db.node_features.find())
     edges = list(db.all_edges_py.find(
         {},
@@ -18,47 +30,58 @@ def load_mongo_data():
     return pd.DataFrame(nodes), pd.DataFrame(node_features), pd.DataFrame(edges)
 
 
-# 数据合并与清洗（网页4数据处理思路）
 def merge_node_data(nodes_df, features_df):
     # 合并时处理字段类型
     nodes_df = nodes_df.merge(features_df, left_on="address", right_on="Address")
 
-    # 转换所有数值列为float（关键修复）
+    # 定义需要处理的数值列（根据实际数据结构调整）
     numeric_cols = [
         'Sent_tnx', 'Received_tnx', 'Number_of_Created_Contracts',
         'Unique_Sent_To_Addresses20', 'Unique_Received_From_Addresses',
-        'Min_Val_Sent', 'Max_Val_Sent', 'Avg_Val_Sent', 'Min_Value_Received',
-        'Max_Value_Received', 'Avg_Value_Received5', 'Avg_Gas_Fee', 'Max_Gas_Fee',
-        'Min_Gas_Fee', 'Total_Transactions', 'Total_Ether_Sent',
-        'Total_Ether_Received', 'Total_Ether_Sent_Contracts',
-        'Min_Value_Sent_To_Contract', 'Max_Value_Sent_To_Contract',
-        'Avg_Value_Sent_To_Contract', 'Time_Diff_between_first_and_last(Mins)',
+        'Min_Val_Sent', 'Max_Val_Sent', 'Avg_Val_Sent',
+        'Min_Value_Received', 'Max_Value_Received', 'Avg_Value_Received5',
+        'Avg_Gas_Fee', 'Max_Gas_Fee', 'Min_Gas_Fee',
+        'Total_Transactions', 'Total_Ether_Sent', 'Total_Ether_Received',
+        'Total_Ether_Sent_Contracts', 'Min_Value_Sent_To_Contract',
+        'Max_Value_Sent_To_Contract', 'Avg_Value_Sent_To_Contract',
+        'Time_Diff_between_first_and_last(Mins)',
         'Avg_min_between_sent_tnx', 'Avg_min_between_received_tnx'
     ]
 
-    # 清洗数值列：移除引号并转换类型
+    # 增强数值处理
+    # 修改数值处理部分：
     for col in numeric_cols:
-        # 处理字符串类型的数值
+        # 转换前处理科学计数法字符串
         if nodes_df[col].dtype == object:
-            nodes_df[col] = nodes_df[col].str.replace('"', '')  # 移除多余引号
-            nodes_df[col] = pd.to_numeric(nodes_df[col], errors='coerce')
+            nodes_df[col] = nodes_df[col].str.replace(r'[^0-9eE\+\-\.]', '', regex=True)
+        nodes_df[col] = pd.to_numeric(nodes_df[col], errors='coerce')
 
-        # 填充空值（用列均值）
-        nodes_df[col].fillna(nodes_df[col].mean(), inplace=True)
+        # 针对大范围特征应用对数变换（例如ERC20相关）
+        if 'ERC20_Total' in col or 'Total_Ether' in col:
+            nodes_df[col] = np.log1p(nodes_df[col].abs())  # 避免负数取log
 
-    # 标准化
-    scaler = StandardScaler()
-    nodes_df[numeric_cols] = scaler.fit_transform(nodes_df[numeric_cols])
+        # 分位数截断
+        q1 = nodes_df[col].quantile(0.001)
+        q99 = nodes_df[col].quantile(0.999)
+        nodes_df[col] = np.clip(nodes_df[col], q1, q99)
 
+        # 填充中位数
+        median_val = nodes_df[col].median()
+        nodes_df[col] = nodes_df[col].fillna(median_val)
+
+    # 使用RobustScaler并限制范围
+    scaler = RobustScaler()
+    scaled = scaler.fit_transform(nodes_df[numeric_cols])
+    scaled = np.clip(scaled, -1e4, 1e4)  # 防止溢出
+    nodes_df[numeric_cols] = scaled.astype(np.float32)
     return nodes_df
-
 
 nodes_df, features_df, edges_df = load_mongo_data()
 merged_nodes = merge_node_data(nodes_df, features_df)
 
 
 def build_node_features(merged_nodes):
-    # 提取node_features中所有数值型特征（你的数据实际有34个）
+    # 提取node_features中所有数值型特征
     numeric_cols = [
         'Sent_tnx', 'Received_tnx', 'Number_of_Created_Contracts',
         'Unique_Sent_To_Addresses20', 'Unique_Received_From_Addresses',
@@ -76,7 +99,7 @@ def build_node_features(merged_nodes):
         'ERC20_Avg_Time_Between_Sent_Tnx', 'ERC20_Avg_Time_Between_Rec_Tnx',
         'ERC20_Avg_gas_fee'
     ]
-    X = merged_nodes[numeric_cols].values.astype(np.float32)
+    X = merged_nodes[numeric_cols].values.astype(np.float64)
     return torch.FloatTensor(X)
 
 
@@ -136,20 +159,26 @@ edge_src, edge_dst, edge_type = process_edges(edges_df, address_map)
 
 
 def generate_labels_and_mask(merged_nodes):
-    # 标签转换（网页6类型转换）
-    labels = merged_nodes["flag"].map({1: 1, 2: 0}).values  # 1=欺诈，0=正常
+    # 标签直接使用转换后的flag
+    labels = merged_nodes["flag"].values.astype(int)
 
-    # 生成训练掩码（70%训练，30%测试）
-    N = len(labels)
-    train_mask = torch.zeros(N, dtype=torch.bool)
-    train_indices = torch.randperm(N)[:int(N * 0.7)]
+    # 生成训练掩码（仅在已标注节点中分割）
+    labeled_mask = (labels == 0) | (labels == 1)  # 只处理正常(0)和欺诈(1)
+    labeled_indices = np.where(labeled_mask)[0]
+
+    # 随机划分训练集
+    np.random.shuffle(labeled_indices)
+    train_size = int(len(labeled_indices) * 0.7)
+    train_indices = labeled_indices[:train_size]
+
+    # 生成PyTorch格式
+    labels_tensor = torch.LongTensor(labels)
+    labels_tensor[~labeled_mask] = -1  # 未打标设为-1
+
+    train_mask = torch.zeros_like(labels_tensor, dtype=torch.bool)
     train_mask[train_indices] = True
 
-    return (
-        torch.LongTensor(labels),
-        train_mask
-    )
-
+    return labels_tensor, train_mask
 
 labels, train_mask = generate_labels_and_mask(merged_nodes)
 

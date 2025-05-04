@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from dgl.nn.pytorch import RelGraphConv
 from sklearn.metrics import f1_score, roc_auc_score
-from dgl_learn.dgl_graph_test_from_mongo import data_graph,edge_src, edge_dst
+from dgl_learn.dgl_graph_test_from_mongo import data_graph, edge_src, edge_dst
 
 N = data_graph.num_nodes()
 E = data_graph.num_edges()
@@ -21,12 +21,19 @@ g.edata['etype'] = edge_type  # 边类型作为RGCN的输入
 g.ndata['label'] = labels
 g.ndata['train_mask'] = train_mask
 
-
 print(f"节点数量: {g.num_nodes()}")
 print(f"边数量: {g.num_edges()}")
 print(f"点特征维度: {g.ndata['feat'].shape[1]}")
 print(f"边特征维度: {g.edata['etype'].shape[1] if len(g.edata['etype'].shape) > 1 else 1}")
 num_rels = int(g.edata['etype'].max().item()) + 1
+
+print("节点特征是否有NaN:", torch.isnan(node_features).any())
+print("节点特征最大值:", node_features.max())
+print("边类型是否有NaN:", torch.isnan(edge_type).any())
+print("边类型最大值:", edge_type.max())
+
+
+
 
 class RGCN(nn.Module):
     def __init__(self, in_dim, hid_dim, out_dim, num_rels):
@@ -42,11 +49,14 @@ class RGCN(nn.Module):
 
 
 model = RGCN(in_dim=g.ndata['feat'].shape[1], hid_dim=16, out_dim=2, num_rels=num_rels)
+print("模型参数范围:")
+for name, param in model.named_parameters():
+    print(f"{name}: {param.data.min():.4f} ~ {param.data.max():.4f}")
 
 print("=====[MODEL FINISH]=====")
 
 
-def train(model, g, epochs=100, lr=0.01):
+def train(model, g, epochs=100, lr=0.0001):
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     best_f1 = 0
 
