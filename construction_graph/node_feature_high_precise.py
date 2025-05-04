@@ -6,18 +6,20 @@ from dao import mongo_client
 
 DOC_CONFIG_FLAG = {
     "transaction": db['transaction_uk'],
-    "erc20_transfer": db['erc20_transfer_uk_v3'],
-    "address": db['valid_address'],
-    "flag": [1, 2]
+    "erc20_transfer": db['erc20_transfer_uk'],
+    "flag": [1, 2],
+    "name": "flag_transaction"
 }
 
 DOC_CONFIG_SECOND = {
     "transaction": db['second_transaction_uk'],
     "erc20_transfer": db['second_erc20_transfer_uk'],
-    "address": db['valid_second_address'],
-    "flag": [0]
+    "flag": [0],
+    "name": "second_transaction"
+
 }
-DOC_CONFIG = DOC_CONFIG_SECOND
+
+global DOC_CONFIG
 
 
 def get_address_features(address):
@@ -277,9 +279,20 @@ def solve_address_features(address):
 
 
 def get_valid_address_process():
-    nodes = DOC_CONFIG['address'].find({"flag": {"$in": DOC_CONFIG['flag']}})
+    global DOC_CONFIG
+    nodes = db.train_nodes.find()
     for node in nodes:
+        if node['flag'] == 0:
+            DOC_CONFIG = DOC_CONFIG_SECOND
+        else:
+            DOC_CONFIG = DOC_CONFIG_FLAG
+        print("======[SOLVE]======")
+        print(f"address:{node['address']},flag:{node['flag']}")
+        print(f"DOC_CONFIG:{DOC_CONFIG['name']}")
         solve_address_features(node['address'])
+
+
+        print("======[DONE]======")
 
 
 # 使用示例
