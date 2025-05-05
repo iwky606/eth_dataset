@@ -1,9 +1,11 @@
+# 获取节点的特征向量
 from collections import defaultdict
 from decimal import Decimal
 import numpy as np
-from dao.mongo_client import db, NODE_FEATURES
-from dao import mongo_client
+from db_connection.mongo_client import db, NODE_FEATURES
+from db_connection import mongo_client
 
+# 中心节点的mongo 文档配置
 DOC_CONFIG_FLAG = {
     "transaction": db['transaction_uk'],
     "erc20_transfer": db['erc20_transfer_uk'],
@@ -11,6 +13,7 @@ DOC_CONFIG_FLAG = {
     "name": "flag_transaction"
 }
 
+# 二阶节点的中心 文档配置
 DOC_CONFIG_SECOND = {
     "transaction": db['second_transaction_uk'],
     "erc20_transfer": db['second_erc20_transfer_uk'],
@@ -248,7 +251,7 @@ def get_csv_features(address):
     import pandas as pd
 
     # 读取CSV文件
-    df = pd.read_csv('../flag_data_wash/flag_data.csv')
+    df = pd.read_csv('../data_collection/flag_data_wash/flag_data.csv')
 
     # 过滤符合条件的行
     filtered_df = df[df['Address'] == address]

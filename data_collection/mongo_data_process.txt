@@ -1,0 +1,119 @@
+# mongodb数据清洗相关命令
+
+# 统计collection集合中，是否hash字段有重复记录
+db.collection.aggregate([
+    {
+        $group: {
+            _id: "$hash",      // 按 hash 字段分组
+            count: {$sum: 1} // 统计每个分组的文档数
+        }
+    },
+    {
+        $match: {
+            count: {$gt: 1}  // 仅保留 count > 1 的分组
+        }
+    }
+]);
+
+# 处理collection中，过滤重复的hash记录。即，最终每个hash只有一条记录。
+# 并导出数据到out_collection中
+db.collection.aggregate([
+    // 步骤1：按 hash 分组，随机保留一个 _id
+    {
+        $group: {
+            _id: "$hash",
+            docId: {$first: "$_id"}, // 保留第一个 _id（或随机选择）
+            // 使用 $first 或自定义逻辑选择要保留的文档字段
+            data: {$first: "$$ROOT"}  // 保留完整文档
+        }
+    },
+    // 步骤2：将分组后的文档还原为原始结构
+    {
+        $replaceRoot: {newRoot: "$data"}
+    },{
+        $out:'out_collection'
+    }
+]);
+
+# 处理collection中，按transaction_hash、from、to、confirmations作为唯一键，仅保留一条记录
+# 并导出数据到out_collection中
+db.collection.aggregate([
+    // 步骤1：按 transaction_hash、from、to、confirmations 分组，随机保留一个 _id
+    {
+        $group: {
+            _id: {
+                transaction_hash: "$hash",
+                from: "$from",
+                to: "$to",
+                confirmations: "$confirmations"
+            },
+            docId: {$first: "$_id"}, // 保留第一个 _id（或随机选择）
+            // 使用 $first 或自定义逻辑选择要保留的文档字段
+            data: {$first: "$$ROOT"}  // 保留完整文档
+        }
+    },
+    // 步骤2：将分组后的文档还原为原始结构
+    {
+        $replaceRoot: {newRoot: "$data"}
+    }, {
+        $out: 'out_collection'
+    }
+]);
+
+# 过滤出collection中，筛选一阶节点的交易记录中另一个节点不是一阶节点的节点
+# 并导出数据到out_collection中
+db.flag_transaction.aggregate([
+    // 联查 valid_address 和 invalid_address 集合
+    {$lookup: {from: "valid_address", localField: "from", foreignField: "address", as: "validFrom"}},
+    {$lookup: {from: "valid_address", localField: "or", foreignField: "address", as: "validOr"}},
+    {$lookup: {from: "invalid_address", localField: "from", foreignField: "address", as: "invalidFrom"}},
+    {$lookup: {from: "invalid_address", localField: "or", foreignField: "address", as: "invalidOr"}},
+
+    // 判断 from/or 是否不存在于两个集合中
+    {
+        $addFields: {
+            isFromInvalid: {
+                $and: [
+                    {$eq: [{$size: "$validFrom"}, 0]},  // valid 集合无匹配
+                    {$eq: [{$size: "$invalidFrom"}, 0]} // invalid 集合无匹配
+                ]
+            },
+            isOrInvalid: {
+                $and: [
+                    {$eq: [{$size: "$validOr"}, 0]},
+                    {$eq: [{$size: "$invalidOr"}, 0]}
+                ]
+            }
+        }
+    },
+
+    // 筛选出 from 或 or 无效的文档
+    {$match: {$or: [{isFromInvalid: true}, {isOrInvalid: true}]}},
+
+    // 提取无效的 from/or 值并去重
+    {
+        $project: {
+            addresses: {
+                $concatArrays: [
+                    {$cond: ["$isFromInvalid", ["$from"], []]}, // 提取无效的 from
+                    {$cond: ["$isOrInvalid", ["$or"], []]}      // 提取无效的 or
+                ]
+            }
+        }
+    },
+    {$unwind: "$addresses"},        // 展开数组
+    {$group: {_id: "$addresses"}},// 按 address 去重
+    {$project: {_id: 0, address: "$_id", flag: {$literal: 1}}}, // 格式化输出
+
+    // 结果写入 second_address 集合（存在则更新 flag，不存在则插入）
+    {
+        $merge: {
+            into: "second_address",
+            on: "address",
+            whenMatched: "merge",    // 若地址已存在，保留原有文档（或根据需求改为覆盖）
+            whenNotMatched: "insert" // 若地址不存在，插入新文档
+        }
+    }
+])
+
+

@@ -1,5 +1,6 @@
-import pymongo
-from dao import mongo_client
+# 获取交易中from和to节点都在train_nodes中的边。即构图需要的边
+from db_connection import mongo_client
+
 
 def process_transactions():
     # 配置数据库连接信息（根据实际情况修改）

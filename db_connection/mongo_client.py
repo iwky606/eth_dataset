@@ -10,7 +10,7 @@ INVALID_ADDRESS = 'invalid_address'
 TRANSACTION = 'transaction'
 ERC20_TRANSFER = 'erc20_transfer'
 
-# second
+# 二阶节点相关的文档
 TEST = ''
 SECOND_ADDRESS = 'second_address_v3'
 INVALID_SECOND_ADDRESS = 'invalid_second_address' + TEST

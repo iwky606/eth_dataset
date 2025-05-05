@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 
 
 def connect_to_mongodb():
-    from dao.mongo_client import db as eth_db
+    from db_connection.mongo_client import db as eth_db
     return eth_db
 
 
@@ -219,7 +219,5 @@ def main():
             print("-" * 60)
 
 
-if __name__ == "__main__":
-    main()
 if __name__ == "__main__":
     main()

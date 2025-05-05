@@ -1,10 +1,10 @@
-import pymongo
+# 随机游走，获取二阶节点地址
 import numpy as np
 from tqdm import tqdm
-from dao.mongo_client import client, ETH_DATASET
+from db_connection.mongo_client import client, ETH_DATASET
 
 
-class Trans2VecNeighborGenerator:
+class TransactionNeighborGenerator:
     def __init__(self, collection_name, db_name=ETH_DATASET, alpha=0.5):
         self.client = client
         self.db = self.client[db_name]
@@ -137,7 +137,7 @@ class Trans2VecNeighborGenerator:
 
 
 if __name__ == "__main__":
-    # processor = Trans2VecNeighborGenerator(collection_name='flag_transaction', alpha=0.5)
-    processor = Trans2VecNeighborGenerator(collection_name='flag_erc20_transfer', alpha=0.5)
+    # processor = TransactionNeighborGenerator(collection_name='flag_transaction', alpha=0.5)
+    processor = TransactionNeighborGenerator(collection_name='flag_erc20_transfer', alpha=0.5)
 
     processor.run()
