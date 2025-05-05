@@ -8,9 +8,10 @@ ETHERSCAN_API_KEY = "IATSDMEKDDRDN6EKIW7JAGCX7BTHPP3CHP"
 # etherscan 接口地址
 BASE_URL = "https://api.etherscan.io/api"
 
+# 最大重试次数
 MAX_RETRIES = 5
 
-
+# 分页获取数据工具
 def get_page_data(params):
     transactions = []
     page = 1
@@ -47,7 +48,7 @@ def get_page_data(params):
     return transactions, True
 
 
-# 获取所有交易记录
+# 获取交易记录
 def get_transactions(address: str):
     params = {
         "module": "account",
@@ -61,7 +62,7 @@ def get_transactions(address: str):
     }
     return get_page_data(params)
 
-
+# 获取代币转账
 def get_erc20_transactions(address: str):
     params = {
         "module": "account",
@@ -75,7 +76,7 @@ def get_erc20_transactions(address: str):
     }
     return get_page_data(params)
 
-
+# 获取以太坊上交易记录以及代币转账
 def get_all_transactions(address: str):
     eth_tx, status = get_transactions(address)
     if not status:
@@ -89,8 +90,8 @@ def get_all_transactions(address: str):
 
 
 if __name__ == "__main__":
-    result, result2, status = get_all_transactions('0xb53e95a4b7c5e15a790df3a66709b2e9f1cf9e3f')
+    # 调试代码，不在工程上直接运行
     import json
+    result, result2, status = get_all_transactions('0xb53e95a4b7c5e15a790df3a66709b2e9f1cf9e3f')
     print(result)
-
     print(json.dumps(result2, indent=4))

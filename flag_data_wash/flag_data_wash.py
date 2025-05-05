@@ -1,5 +1,5 @@
 import pandas as pd
-from api import etherscan_api
+from data_collection import etherscan_api
 from dao import mongo_client
 from dao.mongo_client import TRANSACTION, ERC20_TRANSFER, INVALID_ADDRESS, VALID_ADDRESS, INVALID_SECOND_ADDRESS, \
     VALID_SECOND_ADDRESS, SECOND_TRANSACTION, SECOND_ERC20_TRANSFER

@@ -1,3 +1,6 @@
+# flipside是一个区块链大数据平台，支持免费使用sql查询交易记录
+# 该代码并未在项目中实际用到，但是是一个很好的工具，这里留下示例代码
+# 官网: https://flipsidecrypto.xyz/home/
 from flipside import Flipside
 
 # API 密钥
@@ -7,7 +10,7 @@ flipside = Flipside("d746e9f7-7b42-4039-b1b1-a3e4de4e2911", "https://api-v2.flip
 def execute_sql(sql):
     return flipside.query(sql)
 
-
+# 获取地址的总交易次数
 def get_total_tx_count(address):
     sql = f"""
 SELECT
