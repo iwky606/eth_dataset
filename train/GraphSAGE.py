@@ -169,7 +169,6 @@ def calculate_metrics(preds, labels, mask):
 
     return precision, recall, f1
 
-
 def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -180,7 +179,7 @@ def main():
     train_mask = masks['train'].to(device)
     val_mask = masks['val'].to(device)
 
-    # 模型参数`
+    # 模型参数
     in_feats = g.ndata['feat'].shape[1]
     edge_feats = g.edata['feat'].shape[1]
     model = EdgeEnhancedSAGE(in_feats, edge_feats, 64, 2).to(device)
@@ -212,11 +211,11 @@ def main():
             val_prec, val_rec, val_f1 = calculate_metrics(preds, labels, val_mask)
             val_acc = (preds[val_mask] == labels[val_mask]).float().mean()
 
-        if epoch % 5 == 0:
-            print(f"Epoch {epoch:03d} | Loss: {loss:.4f}")
-            print(f"Train Acc: {train_acc:.4f} | Prec: {train_prec:.4f} | Rec: {train_rec:.4f} | F1: {train_f1:.4f}")
-            print(f"Val   Acc: {val_acc:.4f} | Prec: {val_prec:.4f} | Rec: {val_rec:.4f} | F1: {val_f1:.4f}")
-            print("-" * 60)
+        # 每个epoch都输出结果
+        print(f"\nEpoch {epoch:03d} | Loss: {loss:.4f}")
+        print(f"Train Acc: {train_acc:.4f} | Prec: {train_prec:.4f} | Rec: {train_rec:.4f} | F1: {train_f1:.4f}")
+        print(f"Valid Acc: {val_acc:.4f} | Prec: {val_prec:.4f} | Rec: {val_rec:.4f} | F1: {val_f1:.4f}")
+        print("-" * 60)
 
 
 if __name__ == "__main__":

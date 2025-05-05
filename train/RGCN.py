@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import dgl
-import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import recall_score, f1_score, precision_score
 
 
 def connect_to_mongodb():
@@ -112,7 +112,7 @@ def main():
     in_feats = g.nodes['node'].data['feat'].shape[1]
     hid_feats = 64
     out_feats = 2
-    num_rels = 1  # 单一边类型
+    num_rels = 1
 
     model = RGCN(in_feats, hid_feats, out_feats, num_rels)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
@@ -128,15 +128,34 @@ def main():
         loss.backward()
         optimizer.step()
 
+        # 评估阶段
         model.eval()
         with torch.no_grad():
             logits = model(g, node_features)
             _, preds = torch.max(logits, 1)
-            train_acc = (preds[train_mask] == labels[train_mask]).float().mean()
-            val_acc = (preds[val_mask] == labels[val_mask]).float().mean()
 
-        print(f"Epoch {epoch:03d} | Loss: {loss:.4f} | "
-              f"Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f}")
+            # 训练集指标
+            train_labels = labels[train_mask].cpu().numpy()
+            train_preds = preds[train_mask].cpu().numpy()
+            train_acc = (preds[train_mask] == labels[train_mask]).float().mean().item()
+            train_prec = precision_score(train_labels, train_preds, average='binary')
+            train_recall = recall_score(train_labels, train_preds, average='binary')
+            train_f1 = f1_score(train_labels, train_preds, average='binary')
+
+            # 验证集指标
+            val_labels = labels[val_mask].cpu().numpy()
+            val_preds = preds[val_mask].cpu().numpy()
+            val_acc = (preds[val_mask] == labels[val_mask]).float().mean().item()
+            val_prec = precision_score(val_labels, val_preds, average='binary')
+            val_recall = recall_score(val_labels, val_preds, average='binary')
+            val_f1 = f1_score(val_labels, val_preds, average='binary')
+
+        # 调整后的打印格式
+        print(
+            f"Epoch {epoch:03d} | Loss: {loss:.4f}\n"
+            f"Train Acc: {train_acc:.4f} | Prec: {train_prec:.4f} | Rec: {train_recall:.4f} | F1: {train_f1:.4f}\n"
+            f"Valid Acc: {val_acc:.4f} | Prec: {val_prec:.4f} | Rec: {val_recall:.4f} | F1: {val_f1:.4f}\n"
+        )
 
 
 if __name__ == "__main__":

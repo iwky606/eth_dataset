@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import dgl
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score  # 新增precision_score
 
 
 def connect_to_mongodb():
@@ -181,6 +182,22 @@ class GAT(nn.Module):
         return h
 
 
+def calculate_metrics(preds, labels, mask):
+    y_true = labels[mask]
+    y_pred = preds[mask]
+
+    tp = ((y_pred == 1) & (y_true == 1)).sum().item()
+    tn = ((y_pred == 0) & (y_true == 0)).sum().item()
+    fp = ((y_pred == 1) & (y_true == 0)).sum().item()
+    fn = ((y_pred == 0) & (y_true == 1)).sum().item()
+
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+
+    return precision, recall, f1
+
+
 def main():
     g, labels, train_mask, val_mask, test_mask = load_and_process_data()
 
@@ -198,6 +215,8 @@ def main():
     # 训练循环（添加早停机制）
     best_val_acc = 0
     patience = 10
+    patience_counter = 0  # 需要初始化计数器
+
     for epoch in range(200):
         model.train()
         logits = model(g, g.ndata['feat'], g.edata['feat'])
@@ -212,8 +231,14 @@ def main():
         with torch.no_grad():
             logits = model(g, g.ndata['feat'], g.edata['feat'])
             _, preds = torch.max(logits, 1)
+
+            # 计算训练集指标
             train_acc = (preds[train_mask] == labels[train_mask]).float().mean()
+            train_prec, train_recall, train_f1 = calculate_metrics(preds, labels, train_mask)
+
+            # 计算验证集指标
             val_acc = (preds[val_mask] == labels[val_mask]).float().mean()
+            val_prec, val_recall, val_f1 = calculate_metrics(preds, labels, val_mask)
 
             # 早停机制
             if val_acc > best_val_acc:
@@ -226,7 +251,12 @@ def main():
                 print(f"Early stopping at epoch {epoch}")
                 break
 
-        print(f"Epoch {epoch:03d} | Loss: {loss:.4f} | Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f}")
+        # 格式化输出
+        print(
+            f"Epoch {epoch:03d} | Loss: {loss:.4f}\n"
+            f"Train Acc: {train_acc:.4f} | Prec: {train_prec:.4f} | Rec: {train_recall:.4f} | F1: {train_f1:.4f}\n"
+            f"Val   Acc: {val_acc:.4f} | Prec: {val_prec:.4f} | Rec: {val_recall:.4f} | F1: {val_f1:.4f}\n"
+        )
 
 
 if __name__ == "__main__":
